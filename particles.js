@@ -34,21 +34,29 @@
     off.width = W;
     off.height = H;
 
-    // Scale font to always fit with padding
-    let fs = Math.min(W * 0.1, 130);
-    if (W < 600) fs = W * 0.11;
-
     c.fillStyle = '#fff';
-    c.font = `800 ${fs}px "Inter", system-ui, sans-serif`;
     c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText('4 MORE Labs', W / 2, H * 0.42);
+
+    if (W < 500) {
+      // Mobile: split into two lines, bigger relative size
+      const fs = W * 0.14;
+      c.font = `800 ${fs}px "Inter", system-ui, sans-serif`;
+      c.textBaseline = 'middle';
+      c.fillText('4 MORE', W / 2, H * 0.37);
+      c.fillText('Labs', W / 2, H * 0.37 + fs * 1.15);
+    } else {
+      // Desktop: single line
+      const fs = Math.min(W * 0.1, 130);
+      c.font = `800 ${fs}px "Inter", system-ui, sans-serif`;
+      c.textBaseline = 'middle';
+      c.fillText('4 MORE Labs', W / 2, H * 0.42);
+    }
 
     const img = c.getImageData(0, 0, W, H).data;
     textPixels = [];
 
-    // Adaptive gap — tighter on large screens for full coverage
-    const gap = W > 1200 ? 2 : W > 800 ? 3 : W > 500 ? 3 : 4;
+    // Adaptive gap — tighter sampling for solid coverage
+    const gap = W > 1200 ? 2 : W > 800 ? 3 : W > 500 ? 3 : 2;
 
     for (let y = 0; y < H; y += gap) {
       for (let x = 0; x < W; x += gap) {
@@ -61,8 +69,13 @@
 
   // ── Build particles — one per sampled pixel ──
   function buildParticles() {
-    const count = Math.min(textPixels.length, 12000);
+    const maxCount = W < 500 ? 8000 : 12000;
+    const count = Math.min(textPixels.length, maxCount);
     particles = new Array(count);
+
+    // Bigger particles on mobile for bolder look
+    const sizeBase = W < 500 ? 1.0 : 0.8;
+    const sizeRange = W < 500 ? 1.4 : 1.2;
 
     for (let i = 0; i < count; i++) {
       const tp = textPixels[i % textPixels.length];
@@ -77,7 +90,7 @@
         x: startX, y: startY,
         tx: tp.x, ty: tp.y,
         vx: 0, vy: 0,
-        size: 0.8 + Math.random() * 1.2,
+        size: sizeBase + Math.random() * sizeRange,
         alpha: 0,
         maxAlpha: 0.5 + Math.random() * 0.5,
         settled: false,
@@ -104,13 +117,20 @@
     }
   }
 
-  // ── Mouse ──
+  // ── Mouse & Touch ──
   canvas.addEventListener('mousemove', (e) => {
     const r = canvas.getBoundingClientRect();
     mouse.x = e.clientX - r.left;
     mouse.y = e.clientY - r.top;
   });
   canvas.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+  canvas.addEventListener('touchmove', (e) => {
+    const r = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    mouse.x = touch.clientX - r.left;
+    mouse.y = touch.clientY - r.top;
+  }, { passive: true });
+  canvas.addEventListener('touchend', () => { mouse.x = -9999; mouse.y = -9999; });
 
   function drawBeam() {}
 
@@ -218,13 +238,14 @@
       ctx.fillRect(p.x - s * 0.5, p.y - s * 0.5, s, s);
     }
 
-    // Subtle glow pass for brighter particles (every 4th for perf)
+    // Subtle glow pass for brighter particles (adaptive skip for perf)
+    const glowStep = W < 500 ? 6 : 4;
     ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < particles.length; i += 4) {
+    for (let i = 0; i < particles.length; i += glowStep) {
       const p = particles[i];
-      if (p.alpha < 0.6 || p.size < 1.2) continue;
-      ctx.fillStyle = `hsla(${p.hue},80%,${p.light}%,${p.alpha * 0.04})`;
-      const gs = p.size * 4;
+      if (p.alpha < 0.6 || p.size < 1.0) continue;
+      ctx.fillStyle = `hsla(${p.hue},80%,${p.light}%,${p.alpha * 0.05})`;
+      const gs = p.size * 4.5;
       ctx.fillRect(p.x - gs * 0.5, p.y - gs * 0.5, gs, gs);
     }
     ctx.globalCompositeOperation = 'source-over';
