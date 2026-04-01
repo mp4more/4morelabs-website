@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4 More Labs</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:opsz,wght@14..32,300..800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav" id="nav">
+    <a href="#" class="nav__logo">
+      <img src="logo.svg" alt="4 More Labs" class="nav__logo-icon" />
+    </a>
+    <div class="nav__links">
+      <a href="#projects">Projects</a>
+      <a href="mailto:contact@4morelabs.com">Contact</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero" id="hero">
+    <canvas id="hero-canvas"></canvas>
+    <a href="#projects" class="hero__scroll" aria-label="Scroll down">
+      <svg width="16" height="24" viewBox="0 0 16 24" fill="none"><rect x="1" y="1" width="14" height="22" rx="7" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2" fill="currentColor" class="hero__scroll-dot"/></svg>
+    </a>
+  </section>
+
+  <!-- PROJECTS -->
+  <section class="section" id="projects">
+    <div class="container">
+      <p class="section__label">Projects</p>
+      <h2 class="section__title">What we're building</h2>
+
+      <div class="projects">
+
+        <!-- Ellon AI -->
+        <a href="https://ellon.ai" target="_blank" rel="noopener" class="project" data-reveal>
+          <div class="project__logo-wrap">
+            <img src="ellon-logo.png" alt="Ellon AI" class="project__logo" />
+          </div>
+          <div class="project__body">
+            <div class="project__top">
+              <h3 class="project__name">Ellon AI</h3>
+              <span class="badge badge--live">Live</span>
+            </div>
+            <p class="project__desc">AI-powered document translation platform with a multi-layer agent architecture. Preserves format and context across DOCX, PPTX, and PDF — plus document comparison, automated redaction, and content analysis.</p>
+            <span class="project__link">ellon.ai <span>&rarr;</span></span>
+          </div>
+        </a>
+
+        <!-- Coming Soon 1 -->
+        <div class="project project--soon" data-reveal>
+          <div class="project__logo-wrap project__logo-wrap--soon">
+            <div class="project__placeholder">?</div>
+          </div>
+          <div class="project__body">
+            <div class="project__top">
+              <h3 class="project__name">Coming Soon</h3>
+              <span class="badge badge--soon">TBA</span>
+            </div>
+            <p class="project__desc project__desc--muted">Something new is in the works. Stay tuned.</p>
+          </div>
+        </div>
+
+        <!-- Coming Soon 2 -->
+        <div class="project project--soon" data-reveal>
+          <div class="project__logo-wrap project__logo-wrap--soon">
+            <div class="project__placeholder">?</div>
+          </div>
+          <div class="project__body">
+            <div class="project__top">
+              <h3 class="project__name">Coming Soon</h3>
+              <span class="badge badge--soon">TBA</span>
+            </div>
+            <p class="project__desc project__desc--muted">More details dropping soon.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <img src="logo.svg" alt="4 More Labs" class="footer__logo" />
+        <span>4 More Labs</span>
+      </div>
+      <p>&copy; 2026 4 More Labs</p>
+    </div>
+  </footer>
+
+  <script src="particles.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
