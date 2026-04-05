@@ -1,18 +1,20 @@
 /**
- * Particle Text — glowing particles form "4 MORE Labs"
- * with light beam and floor sparkles.
+ * 4 MORE Labs — Hero Effect
+ * Two-layer system:
+ *   1. Sparkle star field (bottom half, drifting dots with twinkle)
+ *   2. Steering-based particle text that forms "4 MORE Labs"
+ * Ported from the Next.js/React reference project to vanilla JS.
  */
 (function () {
   const canvas = document.getElementById('hero-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
-  let W, H, particles = [], floaters = [], textPixels = [];
-  let mouse = { x: -9999, y: -9999 };
-  const MOUSE_R = 90;
+  let W, H;
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
   let animId;
 
+  /* ─── SIZING ─── */
   function resize() {
     const r = canvas.parentElement.getBoundingClientRect();
     W = r.width;
@@ -22,238 +24,332 @@
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    sampleText();
-    buildParticles();
-    buildFloaters();
+    initStars();
+    spawnWord();
   }
 
-  // ── Sample every pixel of the text ──
-  function sampleText() {
+  /* ═══════════════════════════════════════════
+     LAYER 1 — SPARKLE STAR FIELD
+     Twinkling dots in the bottom portion
+     ═══════════════════════════════════════════ */
+  let stars = [];
+
+  function initStars() {
+    const count = Math.floor((W * H) / 320);
+    stars = new Array(count);
+    const fieldTop = H * 0.45;
+    for (let i = 0; i < count; i++) {
+      stars[i] = {
+        x: Math.random() * W,
+        y: fieldTop + Math.random() * (H - fieldTop),
+        size: 0.3 + Math.random() * 1.2,
+        vx: (Math.random() - 0.5) * 0.15,
+        vy: (Math.random() - 0.5) * 0.1,
+        phase: Math.random() * Math.PI * 2,
+        twinkleSpeed: 2 + Math.random() * 4,
+        baseAlpha: 0.15 + Math.random() * 0.6,
+      };
+    }
+  }
+
+  function drawStars(t) {
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      s.x += s.vx;
+      s.y += s.vy;
+
+      // Wrap
+      if (s.x < -5) s.x = W + 5;
+      if (s.x > W + 5) s.x = -5;
+      if (s.y < H * 0.45) s.vy = Math.abs(s.vy);
+      if (s.y > H + 5) s.y = H * 0.45;
+
+      // Twinkle
+      const alpha = s.baseAlpha * (0.3 + 0.7 * ((Math.sin(t * s.twinkleSpeed + s.phase) + 1) * 0.5));
+      ctx.fillStyle = 'rgba(255,255,255,' + alpha + ')';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.size, 0, 6.283);
+      ctx.fill();
+    }
+  }
+
+  /* ─── Event horizon glow lines ─── */
+  function drawEventHorizon() {
+    const cy = H * 0.62;
+    const midX = W / 2;
+
+    // Wide indigo line
+    const g1 = ctx.createLinearGradient(midX - W * 0.3, cy, midX + W * 0.3, cy);
+    g1.addColorStop(0, 'transparent');
+    g1.addColorStop(0.5, 'rgba(99,102,241,0.5)');
+    g1.addColorStop(1, 'transparent');
+    ctx.fillStyle = g1;
+    ctx.fillRect(midX - W * 0.3, cy - 1, W * 0.6, 2);
+
+    // Blurred version
+    ctx.save();
+    ctx.filter = 'blur(4px)';
+    const g1b = ctx.createLinearGradient(midX - W * 0.3, cy, midX + W * 0.3, cy);
+    g1b.addColorStop(0, 'transparent');
+    g1b.addColorStop(0.5, 'rgba(99,102,241,0.3)');
+    g1b.addColorStop(1, 'transparent');
+    ctx.fillStyle = g1b;
+    ctx.fillRect(midX - W * 0.3, cy - 2, W * 0.6, 4);
+    ctx.restore();
+
+    // Narrow sky-blue center line
+    const g2 = ctx.createLinearGradient(midX - W * 0.12, cy, midX + W * 0.12, cy);
+    g2.addColorStop(0, 'transparent');
+    g2.addColorStop(0.5, 'rgba(56,189,248,0.6)');
+    g2.addColorStop(1, 'transparent');
+    ctx.fillStyle = g2;
+    ctx.fillRect(midX - W * 0.12, cy - 1.5, W * 0.24, 3);
+
+    // Blurred version
+    ctx.save();
+    ctx.filter = 'blur(3px)';
+    const g2b = ctx.createLinearGradient(midX - W * 0.12, cy, midX + W * 0.12, cy);
+    g2b.addColorStop(0, 'transparent');
+    g2b.addColorStop(0.5, 'rgba(56,189,248,0.25)');
+    g2b.addColorStop(1, 'transparent');
+    ctx.fillStyle = g2b;
+    ctx.fillRect(midX - W * 0.12, cy - 3, W * 0.24, 6);
+    ctx.restore();
+  }
+
+  /* ─── Radial mask for star field (soft edges) ─── */
+  function drawStarMask() {
+    const cy = H * 0.62;
+    const g = ctx.createRadialGradient(W / 2, cy, 0, W / 2, cy, Math.max(W * 0.45, 250));
+    g.addColorStop(0, 'rgba(5,5,6,0)');
+    g.addColorStop(0.6, 'rgba(5,5,6,0)');
+    g.addColorStop(1, 'rgba(5,5,6,1)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, H * 0.4, W, H * 0.6);
+  }
+
+  /* ═══════════════════════════════════════════
+     LAYER 2 — STEERING PARTICLE TEXT
+     Particles steer toward text pixel targets
+     with color blending and proximity slow-down
+     ═══════════════════════════════════════════ */
+  let textParticles = [];
+
+  // Accent color: #a77df9 → rgb(167, 125, 249)
+  const ACCENT = { r: 167, g: 125, b: 249 };
+
+  function spawnWord() {
     const off = document.createElement('canvas');
-    const c = off.getContext('2d');
     off.width = W;
     off.height = H;
+    const c = off.getContext('2d');
 
     c.fillStyle = '#fff';
     c.textAlign = 'center';
 
     if (W < 500) {
-      // Mobile: split into two lines, bigger relative size
       const fs = W * 0.14;
-      c.font = `800 ${fs}px "Inter", system-ui, sans-serif`;
+      c.font = '800 ' + fs + 'px "Inter", system-ui, sans-serif';
       c.textBaseline = 'middle';
-      c.fillText('4 MORE', W / 2, H * 0.37);
-      c.fillText('Labs', W / 2, H * 0.37 + fs * 1.15);
+      c.fillText('4 MORE', W / 2, H * 0.35);
+      c.fillText('Labs', W / 2, H * 0.35 + fs * 1.15);
     } else {
-      // Desktop: single line
       const fs = Math.min(W * 0.1, 130);
-      c.font = `800 ${fs}px "Inter", system-ui, sans-serif`;
+      c.font = '800 ' + fs + 'px "Inter", system-ui, sans-serif';
       c.textBaseline = 'middle';
       c.fillText('4 MORE Labs', W / 2, H * 0.42);
     }
 
     const img = c.getImageData(0, 0, W, H).data;
-    textPixels = [];
+    const step = W < 500 ? 4 : 6;
 
-    // Adaptive gap — tighter sampling for solid coverage
-    const gap = W > 1200 ? 2 : W > 800 ? 3 : W > 500 ? 3 : 2;
+    // Collect target coordinates
+    const coords = [];
+    for (let i = 0; i < img.length; i += step * 4) {
+      if (img[i + 3] > 0) {
+        const idx = i / 4;
+        coords.push({ x: idx % W, y: Math.floor(idx / W) });
+      }
+    }
 
-    for (let y = 0; y < H; y += gap) {
-      for (let x = 0; x < W; x += gap) {
-        if (img[(y * W + x) * 4 + 3] > 100) {
-          textPixels.push({ x, y });
+    // Shuffle for organic reveal
+    for (let i = coords.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = coords[i]; coords[i] = coords[j]; coords[j] = tmp;
+    }
+
+    let pi = 0;
+    for (const coord of coords) {
+      let p;
+      if (pi < textParticles.length) {
+        p = textParticles[pi];
+        p.isKilled = false;
+        pi++;
+      } else {
+        p = {
+          x: Math.random() * W,
+          y: H + Math.random() * 100,
+          vx: 0, vy: 0,
+          tx: 0, ty: 0,
+          maxSpeed: Math.random() * 5 + 3,
+          maxForce: 0,
+          closeEnough: 100,
+          cr: 0, cg: 0, cb: 0,       // current color
+          sr: 0, sg: 0, sb: 0,       // start color
+          tr: ACCENT.r, tg: ACCENT.g, tb: ACCENT.b, // target color
+          cw: 0,                       // color weight
+          blendRate: Math.random() * 0.025 + 0.003,
+          isKilled: false,
+        };
+        p.maxForce = p.maxSpeed * 0.05;
+        textParticles.push(p);
+        pi++;
+      }
+
+      // Blend current color forward
+      p.sr = p.sr + (p.tr - p.sr) * p.cw;
+      p.sg = p.sg + (p.tg - p.sg) * p.cw;
+      p.sb = p.sb + (p.tb - p.sb) * p.cw;
+      p.tr = ACCENT.r; p.tg = ACCENT.g; p.tb = ACCENT.b;
+      p.cw = 0;
+
+      p.tx = coord.x;
+      p.ty = coord.y;
+    }
+
+    // Kill excess particles
+    for (let i = pi; i < textParticles.length; i++) {
+      killParticle(textParticles[i]);
+    }
+  }
+
+  function killParticle(p) {
+    if (!p.isKilled) {
+      p.tx = p.x + (Math.random() - 0.5) * 300;
+      p.ty = H + 100 + Math.random() * 200;
+      p.sr = p.sr + (p.tr - p.sr) * p.cw;
+      p.sg = p.sg + (p.tg - p.sg) * p.cw;
+      p.sb = p.sb + (p.tb - p.sb) * p.cw;
+      p.tr = 0; p.tg = 0; p.tb = 0;
+      p.cw = 0;
+      p.isKilled = true;
+    }
+  }
+
+  function stepParticle(p) {
+    // Steering toward target with proximity slow-down
+    const dx = p.tx - p.x;
+    const dy = p.ty - p.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const proximity = dist < p.closeEnough ? dist / p.closeEnough : 1;
+
+    // Desired velocity
+    let dvx = 0, dvy = 0;
+    if (dist > 0) {
+      dvx = (dx / dist) * p.maxSpeed * proximity;
+      dvy = (dy / dist) * p.maxSpeed * proximity;
+    }
+
+    // Steering force
+    let sx = dvx - p.vx;
+    let sy = dvy - p.vy;
+    const sm = Math.sqrt(sx * sx + sy * sy);
+    if (sm > 0) {
+      sx = (sx / sm) * p.maxForce;
+      sy = (sy / sm) * p.maxForce;
+    }
+
+    p.vx += sx;
+    p.vy += sy;
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // Color blend
+    if (p.cw < 1) p.cw = Math.min(p.cw + p.blendRate, 1);
+    p.cr = Math.round(p.sr + (p.tr - p.sr) * p.cw);
+    p.cg = Math.round(p.sg + (p.tg - p.sg) * p.cw);
+    p.cb = Math.round(p.sb + (p.tb - p.sb) * p.cw);
+  }
+
+  function drawTextParticles() {
+    for (let i = textParticles.length - 1; i >= 0; i--) {
+      const p = textParticles[i];
+      stepParticle(p);
+
+      ctx.fillStyle = 'rgb(' + p.cr + ',' + p.cg + ',' + p.cb + ')';
+      ctx.fillRect(p.x, p.y, 2, 2);
+
+      // Remove killed particles that exit the canvas
+      if (p.isKilled) {
+        if (p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > H + 20) {
+          textParticles.splice(i, 1);
         }
       }
     }
   }
 
-  // ── Build particles — one per sampled pixel ──
-  function buildParticles() {
-    const maxCount = W < 500 ? 8000 : 12000;
-    const count = Math.min(textPixels.length, maxCount);
-    particles = new Array(count);
+  /* ─── Mouse / Touch interaction ─── */
+  let mouse = { x: -9999, y: -9999, active: false };
 
-    // Bigger particles on mobile for bolder look
-    const sizeBase = W < 500 ? 1.0 : 0.8;
-    const sizeRange = W < 500 ? 1.4 : 1.2;
-
-    for (let i = 0; i < count; i++) {
-      const tp = textPixels[i % textPixels.length];
-      // Start scattered above
-      const startX = tp.x + (Math.random() - 0.5) * W * 0.5;
-      const startY = -Math.random() * H * 0.8 - 50;
-      // #a77df9 = hsl(263, 91%, 73%)
-      const hue = 255 + Math.random() * 20;
-      const light = 60 + Math.random() * 20;
-
-      particles[i] = {
-        x: startX, y: startY,
-        tx: tp.x, ty: tp.y,
-        vx: 0, vy: 0,
-        size: sizeBase + Math.random() * sizeRange,
-        alpha: 0,
-        maxAlpha: 0.5 + Math.random() * 0.5,
-        settled: false,
-        hue, light,
-      };
-    }
-  }
-
-  function buildFloaters() {
-    floaters = [];
-    const n = Math.floor(W * 0.12);
-    const baseY = H * 0.58;
-    for (let i = 0; i < n; i++) {
-      floaters.push({
-        x: Math.random() * W,
-        y: baseY + Math.random() * H * 0.35,
-        vx: (Math.random() - 0.5) * 0.15,
-        vy: (Math.random() - 0.5) * 0.1,
-        size: 0.4 + Math.random() * 1.8,
-        phase: Math.random() * Math.PI * 2,
-        speed: 0.008 + Math.random() * 0.015,
-        baseAlpha: 0.1 + Math.random() * 0.35,
-      });
-    }
-  }
-
-  // ── Mouse & Touch ──
-  canvas.addEventListener('mousemove', (e) => {
+  canvas.addEventListener('mousemove', function (e) {
     const r = canvas.getBoundingClientRect();
     mouse.x = e.clientX - r.left;
     mouse.y = e.clientY - r.top;
   });
-  canvas.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
-  canvas.addEventListener('touchmove', (e) => {
+  canvas.addEventListener('mouseleave', function () { mouse.x = -9999; mouse.y = -9999; });
+  canvas.addEventListener('touchmove', function (e) {
     const r = canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    mouse.x = touch.clientX - r.left;
-    mouse.y = touch.clientY - r.top;
+    mouse.x = e.touches[0].clientX - r.left;
+    mouse.y = e.touches[0].clientY - r.top;
   }, { passive: true });
-  canvas.addEventListener('touchend', () => { mouse.x = -9999; mouse.y = -9999; });
+  canvas.addEventListener('touchend', function () { mouse.x = -9999; mouse.y = -9999; });
 
-  function drawBeam() {}
+  /* ─── Mouse repulsion on text particles ─── */
+  function applyMouseRepulsion() {
+    const RADIUS = 80;
+    const mx = mouse.x, my = mouse.y;
+    if (mx < -100) return;
 
-  // ── Reflection ──
-  function drawReflection() {
-    const by = H * 0.56;
-    ctx.save();
-    ctx.globalAlpha = 0.06;
-    ctx.translate(0, by * 2);
-    ctx.scale(1, -1);
-    for (let i = 0; i < particles.length; i += 2) {
-      const p = particles[i];
-      if (!p.settled) continue;
-      ctx.fillStyle = `hsla(${p.hue},80%,${p.light}%,${p.alpha * 0.4})`;
-      ctx.fillRect(p.x - p.size * 0.35, p.y - p.size * 0.35, p.size * 0.7, p.size * 0.7);
-    }
-    ctx.restore();
-  }
-
-  // ── Floaters ──
-  function drawFloaters(t) {
-    for (let i = 0; i < floaters.length; i++) {
-      const f = floaters[i];
-      f.x += f.vx;
-      f.y += f.vy;
-      if (f.x < -10) f.x = W + 10;
-      if (f.x > W + 10) f.x = -10;
-      if (f.y < H * 0.55) f.vy = Math.abs(f.vy);
-      if (f.y > H * 0.95) f.vy = -Math.abs(f.vy);
-      const a = f.baseAlpha * ((Math.sin(t * 60 * f.speed + f.phase) + 1) * 0.5);
-      ctx.fillStyle = `rgba(180,200,240,${a})`;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.size, 0, 6.283);
-      ctx.fill();
+    for (let i = 0; i < textParticles.length; i++) {
+      const p = textParticles[i];
+      if (p.isKilled) continue;
+      const dx = p.x - mx;
+      const dy = p.y - my;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < RADIUS && d > 0) {
+        const force = (RADIUS - d) / RADIUS;
+        p.vx += (dx / d) * force * 4;
+        p.vy += (dy / d) * force * 4;
+      }
     }
   }
 
-  // ── Main loop ──
+  /* ═══════════════════════════════════════════
+     MAIN LOOP
+     ═══════════════════════════════════════════ */
   function animate() {
     animId = requestAnimationFrame(animate);
     const t = performance.now() * 0.001;
 
     ctx.clearRect(0, 0, W, H);
-    drawBeam();
 
-    // Smooth spring-based settling
-    const ease = 0.065;
-    const damp = 0.82;
+    // Layer 1: Stars + event horizon
+    drawStars(t);
+    drawStarMask();
+    drawEventHorizon();
 
-    for (let i = 0; i < particles.length; i++) {
-      const p = particles[i];
-
-      if (!p.settled) {
-        const dx = p.tx - p.x;
-        const dy = p.ty - p.y;
-        p.vx += dx * ease;
-        p.vy += dy * ease;
-        p.vx *= damp;
-        p.vy *= damp;
-        p.x += p.vx;
-        p.y += p.vy;
-        p.alpha += (p.maxAlpha - p.alpha) * 0.03;
-
-        if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(p.vx) < 0.2 && Math.abs(p.vy) < 0.2) {
-          p.settled = true;
-          p.x = p.tx;
-          p.y = p.ty;
-          p.alpha = p.maxAlpha;
-        }
-      } else {
-        // Alive float — multi-wave drift
-        const drift1 = Math.sin(t * 1.8 + i * 0.05) * 1.0;
-        const drift2 = Math.cos(t * 0.7 + i * 0.13) * 0.5;
-        const drift3 = Math.sin(t * 3.2 + i * 0.31) * 0.3;
-        p.x = p.tx + drift1 + drift2 + drift3;
-
-        const driftY1 = Math.cos(t * 1.4 + i * 0.08) * 0.8;
-        const driftY2 = Math.sin(t * 0.6 + i * 0.11) * 0.4;
-        const driftY3 = Math.cos(t * 2.5 + i * 0.23) * 0.25;
-        p.y = p.ty + driftY1 + driftY2 + driftY3;
-
-        // Flicker — layered frequencies with sparkle bursts
-        const f1 = Math.sin(t * 5 + i * 1.7) * 0.10;
-        const f2 = Math.sin(t * 13 + i * 3.1) * 0.06;
-        const f3 = Math.sin(t * 29 + i * 7.3) * 0.04;
-        // Occasional sparkle — sharp bright pulse on random particles
-        const spark = Math.pow(Math.max(0, Math.sin(t * 2.3 + i * 5.7)), 16) * 0.25;
-        p.alpha = p.maxAlpha * (0.82 + f1 + f2 + f3 + spark);
-      }
-
-      // Mouse push
-      const mdx = p.x - mouse.x;
-      const mdy = p.y - mouse.y;
-      const md = Math.sqrt(mdx * mdx + mdy * mdy);
-      if (md < MOUSE_R && md > 0) {
-        const f = (MOUSE_R - md) / MOUSE_R;
-        p.vx += (mdx / md) * f * 5;
-        p.vy += (mdy / md) * f * 5;
-        p.settled = false;
-      }
-
-      // Draw — use fillRect for performance (no arc overhead)
-      ctx.fillStyle = `hsla(${p.hue},80%,${p.light}%,${p.alpha})`;
-      const s = p.size;
-      ctx.fillRect(p.x - s * 0.5, p.y - s * 0.5, s, s);
-    }
-
-    // Subtle glow pass for brighter particles (adaptive skip for perf)
-    const glowStep = W < 500 ? 6 : 4;
-    ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < particles.length; i += glowStep) {
-      const p = particles[i];
-      if (p.alpha < 0.6 || p.size < 1.0) continue;
-      ctx.fillStyle = `hsla(${p.hue},80%,${p.light}%,${p.alpha * 0.05})`;
-      const gs = p.size * 4.5;
-      ctx.fillRect(p.x - gs * 0.5, p.y - gs * 0.5, gs, gs);
-    }
-    ctx.globalCompositeOperation = 'source-over';
-
-    drawReflection();
-    drawFloaters(t);
+    // Layer 2: Particle text
+    applyMouseRepulsion();
+    drawTextParticles();
   }
 
-  window.addEventListener('resize', () => { cancelAnimationFrame(animId); resize(); animate(); });
-  document.fonts.ready.then(() => { resize(); animate(); });
+  window.addEventListener('resize', function () {
+    cancelAnimationFrame(animId);
+    resize();
+    animate();
+  });
+  document.fonts.ready.then(function () {
+    resize();
+    animate();
+  });
 })();
